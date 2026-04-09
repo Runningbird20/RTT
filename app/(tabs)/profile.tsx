@@ -6,7 +6,12 @@ import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import { signInWithPassword, signOutUser, signUpWithPassword } from '@/lib/auth';
-import { getSupabaseSetupMessage, supportedSupabaseKeyEnvVars } from '@/lib/supabase';
+import {
+  activeSupabaseKeyEnvVar,
+  getSupabaseSetupMessage,
+  supportedSupabaseKeyEnvVars,
+} from '@/lib/supabase';
+import { ensureAppUserProfile } from '@/lib/userProfile';
 import { useSupabaseSession } from '@/lib/useSupabaseSession';
 
 export default function ProfileScreen() {
@@ -15,6 +20,7 @@ export default function ProfileScreen() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState(getSupabaseSetupMessage());
+  const [profileMessage, setProfileMessage] = useState('Sign in to link a training profile.');
 
   const isSignedIn = Boolean(session?.user);
   const accountLabel = isLoadingSession ? 'Checking' : isSignedIn ? 'Signed in' : 'Signed out';
@@ -22,6 +28,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setMessage(getSupabaseSetupMessage());
+      setProfileMessage('Add your Supabase environment variables to link a training profile.');
       return;
     }
 
@@ -32,7 +39,51 @@ export default function ProfileScreen() {
 
     if (!isLoadingSession) {
       setMessage('Sign in or create an account to sync workouts with Supabase.');
+      setProfileMessage('Sign in to link a training profile.');
     }
+  }, [isLoadingSession, isSupabaseConfigured, session]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProfileLink() {
+      if (!isSupabaseConfigured || isLoadingSession) {
+        return;
+      }
+
+      if (!session) {
+        if (isMounted) {
+          setProfileMessage('Sign in to link a training profile.');
+        }
+        return;
+      }
+
+      try {
+        const profile = await ensureAppUserProfile(session);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setProfileMessage(
+          `Training data is linked to ${profile.email ?? session.user.email ?? profile.id} (${profile.id}).`
+        );
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        const nextMessage =
+          error instanceof Error ? error.message : 'Unable to link the training profile for this account.';
+        setProfileMessage(nextMessage);
+      }
+    }
+
+    void loadProfileLink();
+
+    return () => {
+      isMounted = false;
+    };
   }, [isLoadingSession, isSupabaseConfigured, session]);
 
   const handleSignIn = async () => {
@@ -120,6 +171,8 @@ export default function ProfileScreen() {
       <Card style={styles.card}>
         <Text style={styles.cardTitle}>Auth</Text>
         <Text style={styles.item}>{message}</Text>
+        <Text style={styles.item}>{profileMessage}</Text>
+        <Text style={styles.item}>Active key env var: {activeSupabaseKeyEnvVar ?? 'None detected'}</Text>
         <Text style={styles.item}>Supported env key names: {supportedSupabaseKeyEnvVars.join(', ')}</Text>
 
         {isSignedIn ? (

@@ -7,26 +7,27 @@ import { createClient, processLock, type SupabaseClient } from '@supabase/supaba
 
 export const requiredSupabaseEnvVars = [
   'EXPO_PUBLIC_SUPABASE_URL',
-  'EXPO_PUBLIC_SUPABASE_KEY',
+  'one of EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY, or EXPO_PUBLIC_SUPABASE_KEY',
 ] as const;
 
 export const supportedSupabaseKeyEnvVars = [
-  'EXPO_PUBLIC_SUPABASE_KEY',
-  'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+  'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+  'EXPO_PUBLIC_SUPABASE_KEY',
 ] as const;
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseKey =
-  process.env.EXPO_PUBLIC_SUPABASE_KEY ??
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
-  '';
+const configuredSupabaseKeyEnvVar = supportedSupabaseKeyEnvVars.find(
+  (envVarName) => Boolean(process.env[envVarName])
+);
+const supabaseKey = configuredSupabaseKeyEnvVar ? process.env[configuredSupabaseKeyEnvVar] ?? '' : '';
 
 export const supabaseConfig = {
   url: supabaseUrl,
   key: supabaseKey,
 };
+
+export const activeSupabaseKeyEnvVar = configuredSupabaseKeyEnvVar ?? null;
 
 export const isSupabaseConfigured = Boolean(supabaseConfig.url && supabaseConfig.key);
 
@@ -62,7 +63,7 @@ if (Platform.OS !== 'web' && supabase) {
 
 export function getSupabaseSetupMessage(): string {
   if (isSupabaseConfigured) {
-    return 'Supabase environment variables detected and client initialized.';
+    return `Supabase environment variables detected and client initialized using ${activeSupabaseKeyEnvVar ?? 'an unknown key variable'}.`;
   }
 
   return `Add ${requiredSupabaseEnvVars.join(' and ')} to your Expo environment to connect Supabase.`;

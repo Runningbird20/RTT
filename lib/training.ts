@@ -10,6 +10,7 @@ import type {
   WorkoutFormValues,
   WorkoutRecord,
 } from '@/lib/types';
+import { resolveAppUserId } from '@/lib/userProfile';
 
 type WorkoutRow = {
   id: string;
@@ -76,16 +77,6 @@ type PerformanceRow = {
   created_at: string;
   updated_at: string;
 };
-
-function requireUserId(session: Session | null): string {
-  const userId = session?.user.id;
-
-  if (!userId) {
-    throw new Error('Sign in on the Profile tab to sync with Supabase.');
-  }
-
-  return userId;
-}
 
 function mapWorkoutRow(row: WorkoutRow): WorkoutRecord {
   return {
@@ -185,7 +176,7 @@ function buildBodyweightNotes(values: BodyweightFormValues): string | null {
 
 export async function fetchLatestWorkout(session: Session | null): Promise<WorkoutRecord | null> {
   const client = getSupabaseClient();
-  const userId = requireUserId(session);
+  const userId = await resolveAppUserId(session);
   const { data, error } = await client
     .from('workouts')
     .select(
@@ -208,7 +199,7 @@ export async function fetchRecentWorkouts(
   limit = 8
 ): Promise<WorkoutRecord[]> {
   const client = getSupabaseClient();
-  const userId = requireUserId(session);
+  const userId = await resolveAppUserId(session);
   const { data, error } = await client
     .from('workouts')
     .select(
@@ -231,7 +222,7 @@ export async function fetchRecentBodyweightEntries(
   limit = 8
 ): Promise<BodyweightEntryRecord[]> {
   const client = getSupabaseClient();
-  const userId = requireUserId(session);
+  const userId = await resolveAppUserId(session);
   const { data, error } = await client
     .from('bodyweight_entries')
     .select(
@@ -254,7 +245,7 @@ export async function fetchRecentPerformanceEntries(
   limit = 8
 ): Promise<PerformanceEntryRecord[]> {
   const client = getSupabaseClient();
-  const userId = requireUserId(session);
+  const userId = await resolveAppUserId(session);
   const { data, error } = await client
     .from('performance_entries')
     .select(
@@ -277,7 +268,7 @@ export async function createWorkout(
   values: WorkoutFormValues
 ): Promise<WorkoutRecord> {
   const client = getSupabaseClient();
-  const userId = requireUserId(session);
+  const userId = await resolveAppUserId(session);
   const now = new Date();
   const { data, error } = await client
     .from('workouts')
@@ -309,7 +300,7 @@ export async function createBodyweightEntry(
   workoutId: string | null
 ): Promise<BodyweightEntryRecord> {
   const client = getSupabaseClient();
-  const userId = requireUserId(session);
+  const userId = await resolveAppUserId(session);
   const parsedWeight = Number(values.weight);
 
   if (Number.isNaN(parsedWeight) || parsedWeight <= 0) {
@@ -350,7 +341,7 @@ export async function createExerciseAndPerformanceEntry(
   performanceEntry: PerformanceEntryRecord;
 }> {
   const client = getSupabaseClient();
-  const userId = requireUserId(session);
+  const userId = await resolveAppUserId(session);
   const now = new Date().toISOString();
   const sets = values.sets ? Number(values.sets) : null;
   const reps = values.reps ? Number(values.reps) : null;

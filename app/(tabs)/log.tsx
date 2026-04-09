@@ -6,6 +6,7 @@ import BodyweightForm from '@/components/BodyweightForm';
 import PerformanceForm from '@/components/PerformanceForm';
 import WorkoutForm from '@/components/WorkoutForm';
 import Card from '@/components/ui/Card';
+import { formatError } from '@/lib/formatError';
 import { getSupabaseSetupMessage } from '@/lib/supabase';
 import {
   createBodyweightEntry,
@@ -66,7 +67,7 @@ export default function LogScreen() {
           return;
         }
 
-        const message = error instanceof Error ? error.message : 'Unable to load workout sync status.';
+        const message = formatError(error, 'Unable to load workout sync status.');
         setActiveWorkout(null);
         setSyncMessage(message);
       } finally {
@@ -84,27 +85,47 @@ export default function LogScreen() {
   }, [isFocused, isLoadingSession, isSupabaseConfigured, session]);
 
   const handleWorkoutSubmit = async (values: WorkoutFormValues) => {
-    const workout = await createWorkout(session, values);
-    setActiveWorkout(workout);
-    setSyncMessage(`Workout synced. ${workout.title} is now the active workout for linked entries.`);
+    try {
+      const workout = await createWorkout(session, values);
+      setActiveWorkout(workout);
+      setSyncMessage(`Workout synced. ${workout.title} is now the active workout for linked entries.`);
+    } catch (error) {
+      const message = formatError(error, 'Unable to save workout.');
+      setSyncMessage(message);
+      throw error;
+    }
   };
 
   const handleBodyweightSubmit = async (values: BodyweightFormValues) => {
-    await createBodyweightEntry(session, values, activeWorkout?.id ?? null);
-    setSyncMessage(
-      activeWorkout
-        ? `Bodyweight synced and associated with ${activeWorkout.title}.`
-        : 'Bodyweight synced to Supabase.'
-    );
+    try {
+      await createBodyweightEntry(session, values, activeWorkout?.id ?? null);
+      setSyncMessage(
+        activeWorkout
+          ? `Bodyweight synced and associated with ${activeWorkout.title}.`
+          : 'Bodyweight synced to Supabase.'
+      );
+    } catch (error) {
+      const message = formatError(error, 'Unable to save bodyweight entry.');
+      setSyncMessage(message);
+      throw error;
+    }
   };
 
   const handlePerformanceSubmit = async (values: PerformanceFormValues) => {
     if (!activeWorkout) {
-      throw new Error('Save a workout first so exercise data has a workout to attach to.');
+      const error = new Error('Save a workout first so exercise data has a workout to attach to.');
+      setSyncMessage(error.message);
+      throw error;
     }
 
-    await createExerciseAndPerformanceEntry(session, activeWorkout.id, values);
-    setSyncMessage(`${values.exercise || 'Exercise'} synced and linked to ${activeWorkout.title}.`);
+    try {
+      await createExerciseAndPerformanceEntry(session, activeWorkout.id, values);
+      setSyncMessage(`${values.exercise || 'Exercise'} synced and linked to ${activeWorkout.title}.`);
+    } catch (error) {
+      const message = formatError(error, 'Unable to save performance entry.');
+      setSyncMessage(message);
+      throw error;
+    }
   };
 
   return (
