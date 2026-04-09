@@ -1,84 +1,105 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 
 import BigActionButton from '@/components/BigActionButton';
 import ChartCard from '@/components/ChartCard';
 import StatCard from '@/components/StatCard';
 import Card from '@/components/ui/Card';
-import { formatSignedPercentage, getAverage, getPercentageChange } from '@/lib/calculations';
-import { getSupabaseSetupMessage, supabase } from '@/lib/supabase';
+import { getAverage } from '@/lib/calculations';
+import { getSupabaseSetupMessage } from '@/lib/supabase';
+import { fetchRecentWorkouts } from '@/lib/training';
+import { useSupabaseSession } from '@/lib/useSupabaseSession';
+import type { ChartPoint, WorkoutRecord } from '@/lib/types';
 
-const weeklyLoads = [
-  { label: 'Mon', value: 14 },
-  { label: 'Tue', value: 18 },
-  { label: 'Wed', value: 17 },
-  { label: 'Thu', value: 21 },
-  { label: 'Fri', value: 24 },
-];
-
-type Todo = {
-  id: number;
-  name: string;
-};
+function formatShortDate(value: string): string {
+  return new Date(value).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
+}
 
 export default function HomeScreen() {
-  const currentSessions = 5;
-  const previousSessions = 4;
-  const sessionDelta = getPercentageChange(previousSessions, currentSessions);
-  const averageLoad = getAverage(weeklyLoads.map((item) => item.value));
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [isLoadingTodos, setIsLoadingTodos] = useState(true);
-  const [todoMessage, setTodoMessage] = useState('Connecting to Supabase...');
+  const isFocused = useIsFocused();
+  const { session, isLoadingSession, isSupabaseConfigured } = useSupabaseSession();
+  const [recentWorkouts, setRecentWorkouts] = useState<WorkoutRecord[]>([]);
+  const [isLoadingWorkouts, setIsLoadingWorkouts] = useState(false);
+  const [syncMessage, setSyncMessage] = useState(getSupabaseSetupMessage());
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadTodos() {
-      if (!supabase) {
+    async function loadDashboard() {
+      if (!isFocused || isLoadingSession) {
+        return;
+      }
+
+      if (!isSupabaseConfigured) {
         if (isMounted) {
-          setTodoMessage(getSupabaseSetupMessage());
-          setIsLoadingTodos(false);
+          setRecentWorkouts([]);
+          setSyncMessage(getSupabaseSetupMessage());
+        }
+        return;
+      }
+
+      if (!session) {
+        if (isMounted) {
+          setRecentWorkouts([]);
+          setSyncMessage('Sign in on the Profile tab to load your training dashboard from Supabase.');
         }
         return;
       }
 
       try {
-        const { data, error } = await supabase.from('todos').select('id, name').limit(5);
+        setIsLoadingWorkouts(true);
+        const workouts = await fetchRecentWorkouts(session, 12);
 
         if (!isMounted) {
           return;
         }
 
-        if (error) {
-          setTodos([]);
-          setTodoMessage(`Sample query failed: ${error.message}`);
-        } else if (data && data.length > 0) {
-          setTodos(data as Todo[]);
-          setTodoMessage('Live data from your Supabase todos table.');
-        } else {
-          setTodos([]);
-          setTodoMessage('Connected successfully. No todos found yet.');
-        }
+        setRecentWorkouts(workouts);
+        setSyncMessage(
+          workouts.length > 0
+            ? `Loaded ${workouts.length} recent workouts from Supabase.`
+            : 'Connected to Supabase. Start by saving your first workout on the Log tab.'
+        );
       } catch (error) {
         if (!isMounted) {
           return;
         }
 
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        setTodoMessage(`Sample query failed: ${message}`);
+        const message = error instanceof Error ? error.message : 'Unable to load your dashboard.';
+        setRecentWorkouts([]);
+        setSyncMessage(message);
       } finally {
         if (isMounted) {
-          setIsLoadingTodos(false);
+          setIsLoadingWorkouts(false);
         }
       }
     }
 
-    void loadTodos();
+    void loadDashboard();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isFocused, isLoadingSession, isSupabaseConfigured, session]);
+
+  const recentDurations = recentWorkouts
+    .map((workout) => workout.durationMinutes ?? 0)
+    .filter((value) => value > 0);
+  const averageDuration = recentDurations.length > 0 ? getAverage(recentDurations) : 0;
+  const workoutChartData: ChartPoint[] =
+    recentWorkouts.length > 0
+      ? recentWorkouts
+          .slice(0, 5)
+          .reverse()
+          .map((workout) => ({
+            label: formatShortDate(workout.performedAt),
+            value: workout.durationMinutes ?? 0,
+          }))
+      : [];
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -86,53 +107,57 @@ export default function HomeScreen() {
         <Text style={styles.eyebrow}>READY TO TRAIN</Text>
         <Text style={styles.title}>Home</Text>
         <Text style={styles.subtitle}>
-          Your starter dashboard is now connected for real Supabase-backed reads alongside the mock
-          training data.
+          Your dashboard now reads real workout data from Supabase when you are signed in.
         </Text>
       </View>
 
       <View style={styles.statsRow}>
         <StatCard
-          title="Weekly Sessions"
-          value={String(currentSessions)}
-          caption={`${formatSignedPercentage(sessionDelta)} vs last week`}
+          title="Recent Workouts"
+          value={String(recentWorkouts.length)}
+          caption={session ? 'Pulled from Supabase' : 'Sign in to sync'}
         />
         <StatCard
-          title="Average Load"
-          value={`${averageLoad.toFixed(1)}k`}
-          caption="Based on this week's entries"
+          title="Average Duration"
+          value={`${averageDuration.toFixed(0)} min`}
+          caption="Across fetched workouts"
           accent="#0f766e"
         />
       </View>
 
       <BigActionButton
         title="Log today's workout"
-        description="Jump into the log tab to add a session, bodyweight update, or performance note."
+        description="Jump into the log tab to save workouts, bodyweight entries, and exercise performance."
       />
+
+      <Card style={styles.syncCard}>
+        <Text style={styles.syncTitle}>Connection</Text>
+        <Text style={styles.syncText}>{syncMessage}</Text>
+        {isLoadingWorkouts ? <Text style={styles.syncHint}>Refreshing dashboard...</Text> : null}
+      </Card>
 
       <ChartCard
-        title="Training Load"
-        subtitle="Mock weekly volume"
-        data={weeklyLoads}
-        footer="Swap this sample series for real progress data from your backend."
+        title="Recent Workout Duration"
+        subtitle="Minutes per session"
+        data={workoutChartData}
+        footer={
+          session
+            ? 'This chart updates from your most recent workouts in Supabase.'
+            : 'Sign in to replace the empty chart with your live workout history.'
+        }
       />
 
-      <Card style={styles.todoCard}>
-        <Text style={styles.todoTitle}>Supabase Todo Preview</Text>
-        <Text style={styles.todoSubtitle}>{todoMessage}</Text>
-
-        {isLoadingTodos ? <Text style={styles.todoItem}>Loading...</Text> : null}
-
-        {!isLoadingTodos && todos.length === 0 ? (
-          <Text style={styles.todoItem}>No rows to display.</Text>
-        ) : null}
-
-        {!isLoadingTodos &&
-          todos.map((item) => (
-            <Text key={item.id} style={styles.todoItem}>
-              {item.name}
+      <Card style={styles.listCard}>
+        <Text style={styles.listTitle}>Recent activity</Text>
+        {recentWorkouts.length === 0 ? (
+          <Text style={styles.listItem}>No synced workouts yet.</Text>
+        ) : (
+          recentWorkouts.slice(0, 4).map((workout) => (
+            <Text key={workout.id} style={styles.listItem}>
+              {formatShortDate(workout.performedAt)} - {workout.title}
             </Text>
-          ))}
+          ))
+        )}
       </Card>
     </ScrollView>
   );
@@ -172,22 +197,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
   },
-  todoCard: {
-    gap: 10,
+  syncCard: {
+    gap: 8,
   },
-  todoTitle: {
+  syncTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
   },
-  todoSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#4b5563',
-  },
-  todoItem: {
+  syncText: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#1f2937',
+    color: '#374151',
+  },
+  syncHint: {
+    fontSize: 13,
+    color: '#6b7280',
+  },
+  listCard: {
+    gap: 10,
+  },
+  listTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  listItem: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#374151',
   },
 });

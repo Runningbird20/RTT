@@ -7,15 +7,24 @@ import Input from '@/components/ui/Input';
 import type { BodyweightFormValues } from '@/lib/types';
 
 type BodyweightFormProps = {
-  onSubmit?: (values: BodyweightFormValues) => void;
+  onSubmit?: (values: BodyweightFormValues) => Promise<void> | void;
+  disabled?: boolean;
+  helperText?: string;
 };
 
-export default function BodyweightForm({ onSubmit }: BodyweightFormProps) {
-  const [values, setValues] = useState<BodyweightFormValues>({
-    weight: '',
-    measuredAt: '',
-    notes: '',
-  });
+const initialValues: BodyweightFormValues = {
+  weight: '',
+  measuredAt: '',
+  notes: '',
+};
+
+export default function BodyweightForm({
+  onSubmit,
+  disabled = false,
+  helperText,
+}: BodyweightFormProps) {
+  const [values, setValues] = useState<BodyweightFormValues>(initialValues);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateValue = <K extends keyof BodyweightFormValues>(
     key: K,
@@ -24,11 +33,26 @@ export default function BodyweightForm({ onSubmit }: BodyweightFormProps) {
     setValues((current) => ({ ...current, [key]: value }));
   };
 
-  const handleSubmit = () => {
-    if (onSubmit) {
-      onSubmit(values);
-    } else {
-      Alert.alert('Bodyweight saved', `${values.weight || 'New'} entry captured locally.`);
+  const handleSubmit = async () => {
+    if (disabled || isSubmitting) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      if (onSubmit) {
+        await onSubmit(values);
+        setValues(initialValues);
+        Alert.alert('Bodyweight saved', `${values.weight || 'New'} entry synced to Supabase.`);
+      } else {
+        Alert.alert('Bodyweight saved', `${values.weight || 'New'} entry captured locally.`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to save bodyweight entry.';
+      Alert.alert('Save failed', message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -62,7 +86,14 @@ export default function BodyweightForm({ onSubmit }: BodyweightFormProps) {
         onChangeText={(text) => updateValue('notes', text)}
       />
 
-      <Button title="Save Bodyweight" onPress={handleSubmit} variant="secondary" />
+      {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
+
+      <Button
+        title={isSubmitting ? 'Saving...' : 'Save Bodyweight'}
+        onPress={handleSubmit}
+        variant="secondary"
+        disabled={disabled || isSubmitting}
+      />
     </Card>
   );
 }
@@ -78,5 +109,10 @@ const styles = StyleSheet.create({
   },
   multiline: {
     minHeight: 100,
+  },
+  helperText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#6b7280',
   },
 });

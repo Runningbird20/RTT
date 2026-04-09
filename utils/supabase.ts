@@ -42,6 +42,14 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
     })
   : null;
 
+export function getSupabaseClient(): SupabaseClient {
+  if (!supabase) {
+    throw new Error(getSupabaseSetupMessage());
+  }
+
+  return supabase;
+}
+
 if (Platform.OS !== 'web' && supabase) {
   AppState.addEventListener('change', (state) => {
     if (state === 'active') {

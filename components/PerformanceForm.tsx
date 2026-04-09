@@ -7,17 +7,26 @@ import Input from '@/components/ui/Input';
 import type { PerformanceFormValues } from '@/lib/types';
 
 type PerformanceFormProps = {
-  onSubmit?: (values: PerformanceFormValues) => void;
+  onSubmit?: (values: PerformanceFormValues) => Promise<void> | void;
+  disabled?: boolean;
+  helperText?: string;
 };
 
-export default function PerformanceForm({ onSubmit }: PerformanceFormProps) {
-  const [values, setValues] = useState<PerformanceFormValues>({
-    exercise: '',
-    sets: '',
-    reps: '',
-    load: '',
-    notes: '',
-  });
+const initialValues: PerformanceFormValues = {
+  exercise: '',
+  sets: '',
+  reps: '',
+  load: '',
+  notes: '',
+};
+
+export default function PerformanceForm({
+  onSubmit,
+  disabled = false,
+  helperText,
+}: PerformanceFormProps) {
+  const [values, setValues] = useState<PerformanceFormValues>(initialValues);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateValue = <K extends keyof PerformanceFormValues>(
     key: K,
@@ -26,11 +35,26 @@ export default function PerformanceForm({ onSubmit }: PerformanceFormProps) {
     setValues((current) => ({ ...current, [key]: value }));
   };
 
-  const handleSubmit = () => {
-    if (onSubmit) {
-      onSubmit(values);
-    } else {
-      Alert.alert('Performance saved', `${values.exercise || 'Exercise'} has been logged locally.`);
+  const handleSubmit = async () => {
+    if (disabled || isSubmitting) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      if (onSubmit) {
+        await onSubmit(values);
+        setValues(initialValues);
+        Alert.alert('Performance saved', `${values.exercise || 'Exercise'} synced to Supabase.`);
+      } else {
+        Alert.alert('Performance saved', `${values.exercise || 'Exercise'} has been logged locally.`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to save performance entry.';
+      Alert.alert('Save failed', message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -86,7 +110,13 @@ export default function PerformanceForm({ onSubmit }: PerformanceFormProps) {
         onChangeText={(text) => updateValue('notes', text)}
       />
 
-      <Button title="Save Performance" onPress={handleSubmit} />
+      {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
+
+      <Button
+        title={isSubmitting ? 'Saving...' : 'Save Performance'}
+        onPress={handleSubmit}
+        disabled={disabled || isSubmitting}
+      />
     </Card>
   );
 }
@@ -109,5 +139,10 @@ const styles = StyleSheet.create({
   },
   multiline: {
     minHeight: 100,
+  },
+  helperText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#6b7280',
   },
 });

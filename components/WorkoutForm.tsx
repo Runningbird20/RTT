@@ -7,28 +7,51 @@ import Input from '@/components/ui/Input';
 import type { WorkoutFormValues, WorkoutIntensity } from '@/lib/types';
 
 type WorkoutFormProps = {
-  onSubmit?: (values: WorkoutFormValues) => void;
+  onSubmit?: (values: WorkoutFormValues) => Promise<void> | void;
+  disabled?: boolean;
+  helperText?: string;
 };
 
 const intensities: WorkoutIntensity[] = ['Easy', 'Moderate', 'Hard'];
+const initialValues: WorkoutFormValues = {
+  workoutName: '',
+  durationMinutes: '',
+  intensity: 'Moderate',
+  notes: '',
+};
 
-export default function WorkoutForm({ onSubmit }: WorkoutFormProps) {
-  const [values, setValues] = useState<WorkoutFormValues>({
-    workoutName: '',
-    durationMinutes: '',
-    intensity: 'Moderate',
-    notes: '',
-  });
+export default function WorkoutForm({
+  onSubmit,
+  disabled = false,
+  helperText,
+}: WorkoutFormProps) {
+  const [values, setValues] = useState<WorkoutFormValues>(initialValues);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateValue = <K extends keyof WorkoutFormValues>(key: K, value: WorkoutFormValues[K]) => {
     setValues((current) => ({ ...current, [key]: value }));
   };
 
-  const handleSubmit = () => {
-    if (onSubmit) {
-      onSubmit(values);
-    } else {
-      Alert.alert('Workout saved', `${values.workoutName || 'Session'} has been captured locally.`);
+  const handleSubmit = async () => {
+    if (disabled || isSubmitting) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      if (onSubmit) {
+        await onSubmit(values);
+        setValues(initialValues);
+        Alert.alert('Workout saved', `${values.workoutName || 'Session'} synced to Supabase.`);
+      } else {
+        Alert.alert('Workout saved', `${values.workoutName || 'Session'} has been captured locally.`);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to save workout.';
+      Alert.alert('Save failed', message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -82,7 +105,14 @@ export default function WorkoutForm({ onSubmit }: WorkoutFormProps) {
         onChangeText={(text) => updateValue('notes', text)}
       />
 
-      <Button title="Save Workout" onPress={handleSubmit} variant="dark" />
+      {helperText ? <Text style={styles.helperText}>{helperText}</Text> : null}
+
+      <Button
+        title={isSubmitting ? 'Saving...' : 'Save Workout'}
+        onPress={handleSubmit}
+        variant="dark"
+        disabled={disabled || isSubmitting}
+      />
     </Card>
   );
 }
@@ -131,5 +161,10 @@ const styles = StyleSheet.create({
   },
   multiline: {
     minHeight: 110,
+  },
+  helperText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#6b7280',
   },
 });

@@ -4,6 +4,7 @@ type ButtonProps = {
   title: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'dark';
+  disabled?: boolean;
 };
 
 const variantStyles = {
@@ -25,14 +26,17 @@ export default function Button({
   title,
   onPress,
   variant = 'primary',
+  disabled = false,
 }: ButtonProps) {
   return (
     <Pressable
+      disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: variantStyles[variant].backgroundColor },
-        pressed && styles.pressed,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
       ]}>
       <Text style={[styles.text, { color: variantStyles[variant].textColor }]}>{title}</Text>
     </Pressable>
@@ -49,6 +53,9 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.92,
+  },
+  disabled: {
+    opacity: 0.45,
   },
   text: {
     fontSize: 15,
