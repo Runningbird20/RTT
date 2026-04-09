@@ -1,0 +1,5 @@
+id,workout_id,user_id,exercise_name,sets,reps,load,weight_unit,order_index,rest_seconds,rpe,performed_at,notes
+eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee1,aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1,11111111-1111-1111-1111-111111111111,Bench Press,5,5,185,lb,0,180,8.5,2026-04-01T15:35:00Z,Last set was challenging
+eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee2,aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1,11111111-1111-1111-1111-111111111111,Bent Over Row,4,8,135,lb,1,120,7.5,2026-04-01T15:50:00Z,Controlled eccentric
+eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee3,aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3,22222222-2222-2222-2222-222222222222,Back Squat,5,3,275,lb,0,210,9.0,2026-04-02T18:25:00Z,Pause at bottom
+eeeeeeee-eeee-eeee-eeee-eeeeeeeeeee4,aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3,22222222-2222-2222-2222-222222222222,Romanian Deadlift,4,6,205,lb,1,150,8.0,2026-04-02T18:45:00Z,Hamstrings felt strong
