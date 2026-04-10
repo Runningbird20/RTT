@@ -90,7 +90,7 @@ export default function ProgressScreen() {
   }, [isFocused, isLoadingSession, isSupabaseConfigured, session]);
 
   const bodyweightChartData: ChartPoint[] = bodyweightEntries.map((entry) => ({
-    label: formatShortDate(entry.measuredAt),
+    label: formatShortDate(`${entry.entryDate}T12:00:00`),
     value: entry.weight,
   }));
   const performanceChartData: ChartPoint[] = performanceEntries.map((entry) => ({

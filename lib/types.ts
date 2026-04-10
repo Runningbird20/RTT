@@ -107,8 +107,7 @@ export type WorkoutLogFormValues = {
 
 export type BodyweightFormValues = {
   weight: string;
-  measuredAt: string;
-  notes: string;
+  entryDate: string;
 };
 
 export type PerformanceFormValues = {
