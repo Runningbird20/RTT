@@ -155,7 +155,7 @@ export default function ProgressScreen() {
         title="Performance Trend"
         subtitle="Recent working-set metrics"
         data={performanceChartData}
-        footer="Performance entries are created alongside exercise entries from the Log tab."
+        footer="Performance entries are created automatically when you save a workout log."
       />
     </ScrollView>
   );

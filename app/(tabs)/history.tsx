@@ -58,8 +58,8 @@ export default function HistoryScreen() {
         setWorkouts(recentWorkouts);
         setMessage(
           recentWorkouts.length > 0
-            ? 'Showing recent workouts from Supabase.'
-            : 'Connected to Supabase. Your workout history will appear here after your first saved session.'
+            ? 'Showing recent workout logs from Supabase.'
+            : 'Connected to Supabase. Your workout history will appear here after your first saved log.'
         );
       } catch (error) {
         if (!isMounted) {
@@ -87,7 +87,7 @@ export default function HistoryScreen() {
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Text style={styles.title}>History</Text>
-        <Text style={styles.subtitle}>Recent workouts synced from Supabase appear here.</Text>
+        <Text style={styles.subtitle}>Recent workout logs synced from Supabase appear here.</Text>
       </View>
 
       <Card style={styles.messageCard}>
@@ -98,13 +98,8 @@ export default function HistoryScreen() {
 
       {workouts.map((entry) => (
         <Card key={entry.id} style={styles.card}>
-          <View style={styles.row}>
-            <Text style={styles.cardTitle}>{entry.title}</Text>
-            <Text style={styles.badge}>{entry.intensity}</Text>
-          </View>
-          <Text style={styles.meta}>
-            {formatLongDate(entry.performedAt)} - {entry.durationMinutes ?? 0} min
-          </Text>
+          <Text style={styles.cardTitle}>{entry.title}</Text>
+          <Text style={styles.meta}>{formatLongDate(entry.performedAt)}</Text>
           <Text style={styles.notes}>{entry.notes || 'No notes added.'}</Text>
         </Card>
       ))}
@@ -156,26 +151,10 @@ const styles = StyleSheet.create({
   card: {
     gap: 10,
   },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
   cardTitle: {
-    flex: 1,
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
-  },
-  badge: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0f766e',
-    backgroundColor: '#d8f3ed',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
   },
   meta: {
     fontSize: 14,
