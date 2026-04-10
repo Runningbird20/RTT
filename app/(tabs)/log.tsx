@@ -1,18 +1,30 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 
 import BodyweightForm from '@/components/BodyweightForm';
 import WorkoutLogForm from '@/components/WorkoutLogForm';
 import Card from '@/components/ui/Card';
 import { formatError } from '@/lib/formatError';
 import { getSupabaseSetupMessage } from '@/lib/supabase';
-import { createBodyweightEntry, createWorkoutLog } from '@/lib/training';
+import { createBodyweightEntry, createWorkoutLog, fetchRecentBodyweightEntries } from '@/lib/training';
 import { useSupabaseSession } from '@/lib/useSupabaseSession';
-import type { BodyweightFormValues, WorkoutLogFormValues } from '@/lib/types';
+import type { BodyweightEntryRecord, BodyweightFormValues, WorkoutLogFormValues } from '@/lib/types';
+
+function formatEntryDate(value: string): string {
+  return new Date(`${value}T12:00:00`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 export default function LogScreen() {
+  const isFocused = useIsFocused();
   const { session, isLoadingSession, isSupabaseConfigured } = useSupabaseSession();
   const [syncMessage, setSyncMessage] = useState(getSupabaseSetupMessage());
+  const [recentBodyweightEntries, setRecentBodyweightEntries] = useState<BodyweightEntryRecord[]>([]);
+  const [isLoadingBodyweightEntries, setIsLoadingBodyweightEntries] = useState(false);
 
   useEffect(() => {
     if (isLoadingSession) {
@@ -32,6 +44,48 @@ export default function LogScreen() {
     setSyncMessage('Signed in and ready to save workout logs to Supabase.');
   }, [isLoadingSession, isSupabaseConfigured, session]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadRecentBodyweightEntries() {
+      if (!isFocused || isLoadingSession) {
+        return;
+      }
+
+      if (!isSupabaseConfigured || !session) {
+        if (isMounted) {
+          setRecentBodyweightEntries([]);
+        }
+        return;
+      }
+
+      try {
+        setIsLoadingBodyweightEntries(true);
+        const entries = await fetchRecentBodyweightEntries(session, 5);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setRecentBodyweightEntries([...entries].reverse());
+      } catch {
+        if (isMounted) {
+          setRecentBodyweightEntries([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingBodyweightEntries(false);
+        }
+      }
+    }
+
+    void loadRecentBodyweightEntries();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isFocused, isLoadingSession, isSupabaseConfigured, session]);
+
   const handleWorkoutSubmit = async (values: WorkoutLogFormValues) => {
     try {
       const result = await createWorkoutLog(session, values);
@@ -45,7 +99,8 @@ export default function LogScreen() {
 
   const handleBodyweightSubmit = async (values: BodyweightFormValues) => {
     try {
-      await createBodyweightEntry(session, values, null);
+      const savedEntry = await createBodyweightEntry(session, values, null);
+      setRecentBodyweightEntries((current) => [savedEntry, ...current].slice(0, 5));
       setSyncMessage('Bodyweight synced to Supabase.');
     } catch (error) {
       const message = formatError(error, 'Unable to save bodyweight entry.');
@@ -84,10 +139,26 @@ export default function LogScreen() {
         disabled={!session}
         helperText={
           session
-            ? 'This still saves to bodyweight_entries in Supabase.'
+            ? 'This saves a date + weight entry to bodyweight_entries in Supabase.'
             : 'Sign in on the Profile tab before saving bodyweight entries.'
         }
       />
+
+      <Card style={styles.statusCard}>
+        <Text style={styles.statusTitle}>Recent bodyweight entries</Text>
+        {isLoadingBodyweightEntries ? (
+          <Text style={styles.statusHint}>Refreshing recent entries...</Text>
+        ) : recentBodyweightEntries.length > 0 ? (
+          recentBodyweightEntries.map((entry) => (
+            <View key={entry.id} style={styles.entryRow}>
+              <Text style={styles.entryDate}>{formatEntryDate(entry.entryDate)}</Text>
+              <Text style={styles.entryWeight}>{entry.weight.toFixed(1)} lb</Text>
+            </View>
+          ))
+        ) : (
+          <Text style={styles.statusHint}>No bodyweight entries yet.</Text>
+        )}
+      </Card>
     </ScrollView>
   );
 }
@@ -126,5 +197,21 @@ const styles = StyleSheet.create({
   statusHint: {
     fontSize: 13,
     color: '#6b7280',
+  },
+  entryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 4,
+  },
+  entryDate: {
+    fontSize: 15,
+    color: '#374151',
+  },
+  entryWeight: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827',
   },
 });

@@ -153,26 +153,32 @@ function mapPerformanceRow(row: PerformanceRow): PerformanceEntryRecord {
   };
 }
 
-function buildTimestampFromLabel(label: string): string {
-  const trimmed = label.trim();
-
-  if (!trimmed) {
-    return new Date().toISOString();
-  }
-
-  const parsed = new Date(trimmed);
-
-  if (!Number.isNaN(parsed.getTime())) {
-    return parsed.toISOString();
-  }
-
-  return new Date().toISOString();
+function getTodayEntryDate(): string {
+  const now = new Date();
+  const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 10);
 }
 
-function buildBodyweightNotes(values: BodyweightFormValues): string | null {
-  const parts = [values.measuredAt.trim(), values.notes.trim()].filter(Boolean);
+function buildBodyweightTimestamp(entryDate: string): string {
+  const trimmed = entryDate.trim() || getTodayEntryDate();
 
-  return parts.length > 0 ? parts.join(' | ') : null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    throw new Error('Enter a valid date in YYYY-MM-DD format.');
+  }
+
+  const [year, month, day] = trimmed.split('-').map(Number);
+  const timestamp = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+
+  if (
+    Number.isNaN(timestamp.getTime()) ||
+    timestamp.getUTCFullYear() !== year ||
+    timestamp.getUTCMonth() !== month - 1 ||
+    timestamp.getUTCDate() !== day
+  ) {
+    throw new Error('Enter a valid calendar date before saving.');
+  }
+
+  return timestamp.toISOString();
 }
 
 function buildWorkoutLogTitle(values: WorkoutLogFormValues): string {
@@ -256,7 +262,7 @@ export async function fetchRecentBodyweightEntries(
       'id, user_id, workout_id, weight, unit, entry_date, measured_at, body_fat_percentage, notes, created_at, updated_at'
     )
     .eq('user_id', userId)
-    .order('measured_at', { ascending: false })
+    .order('entry_date', { ascending: false })
     .limit(limit)
     .returns<BodyweightRow[]>();
 
@@ -334,7 +340,8 @@ export async function createBodyweightEntry(
     throw new Error('Enter a valid bodyweight value before saving.');
   }
 
-  const measuredAt = buildTimestampFromLabel(values.measuredAt);
+  const entryDate = values.entryDate.trim() || getTodayEntryDate();
+  const measuredAt = buildBodyweightTimestamp(entryDate);
   const { data, error } = await client
     .from('bodyweight_entries')
     .insert({
@@ -342,10 +349,10 @@ export async function createBodyweightEntry(
       workout_id: workoutId,
       weight: parsedWeight,
       unit: 'lb',
-      entry_date: measuredAt.slice(0, 10),
+      entry_date: entryDate,
       measured_at: measuredAt,
       body_fat_percentage: null,
-      notes: buildBodyweightNotes(values),
+      notes: null,
     })
     .select(
       'id, user_id, workout_id, weight, unit, entry_date, measured_at, body_fat_percentage, notes, created_at, updated_at'
