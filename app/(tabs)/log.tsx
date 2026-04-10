@@ -3,13 +3,24 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 
 import BodyweightForm from '@/components/BodyweightForm';
+import PerformanceForm from '@/components/PerformanceForm';
 import WorkoutLogForm from '@/components/WorkoutLogForm';
 import Card from '@/components/ui/Card';
 import { formatError } from '@/lib/formatError';
 import { getSupabaseSetupMessage } from '@/lib/supabase';
-import { createBodyweightEntry, createWorkoutLog, fetchRecentBodyweightEntries } from '@/lib/training';
+import {
+  createBodyweightEntry,
+  createPerformanceMetricEntry,
+  createWorkoutLog,
+  fetchRecentBodyweightEntries,
+} from '@/lib/training';
 import { useSupabaseSession } from '@/lib/useSupabaseSession';
-import type { BodyweightEntryRecord, BodyweightFormValues, WorkoutLogFormValues } from '@/lib/types';
+import type {
+  BodyweightEntryRecord,
+  BodyweightFormValues,
+  PerformanceMetricFormValues,
+  WorkoutLogFormValues,
+} from '@/lib/types';
 
 function formatEntryDate(value: string): string {
   return new Date(`${value}T12:00:00`).toLocaleDateString('en-US', {
@@ -109,6 +120,19 @@ export default function LogScreen() {
     }
   };
 
+  const handlePerformanceSubmit = async (values: PerformanceMetricFormValues) => {
+    try {
+      const savedEntry = await createPerformanceMetricEntry(session, values);
+      setSyncMessage(
+        `${savedEntry.metricName} synced to Supabase${savedEntry.unit ? ` in ${savedEntry.unit}` : ''}.`
+      );
+    } catch (error) {
+      const message = formatError(error, 'Unable to save performance entry.');
+      setSyncMessage(message);
+      throw error;
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.header}>
@@ -141,6 +165,16 @@ export default function LogScreen() {
           session
             ? 'This saves a date + weight entry to bodyweight_entries in Supabase.'
             : 'Sign in on the Profile tab before saving bodyweight entries.'
+        }
+      />
+
+      <PerformanceForm
+        onSubmit={handlePerformanceSubmit}
+        disabled={!session}
+        helperText={
+          session
+            ? 'This saves a metric type, numeric value, and unit to performance_entries in Supabase.'
+            : 'Sign in on the Profile tab before saving performance entries.'
         }
       />
 

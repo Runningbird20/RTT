@@ -11,6 +11,7 @@
 -- - workout logging saves exercise, sets, reps, weight, and notes
 -- - bodyweight logging uses a simple date + weight input
 -- - the bodyweight UI shows dates in US format, but stores them as ISO dates
+-- - performance logging can save standalone metric type + value + unit rows
 -- - bodyweight history/progress reads bodyweight_entries.entry_date
 --
 -- It is safe to run multiple times.
@@ -224,6 +225,9 @@ create table if not exists public.performance_entries (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+comment on table public.performance_entries is
+'Performance metrics, including standalone metric logs and workout-linked entries.';
 
 alter table public.performance_entries
   add column if not exists user_id uuid,

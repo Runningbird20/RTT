@@ -131,7 +131,7 @@ export default function ProgressScreen() {
           accent="#0f766e"
         />
         <StatCard
-          title="Top Performance"
+          title="Latest Performance"
           value={latestPerformance > 0 ? `${latestPerformance.toFixed(1)}` : '--'}
           caption={
             performanceEntries.length > 1
@@ -153,9 +153,9 @@ export default function ProgressScreen() {
 
       <ChartCard
         title="Performance Trend"
-        subtitle="Recent working-set metrics"
+        subtitle="Recent saved performance metrics"
         data={performanceChartData}
-        footer="Performance entries are created automatically when you save a workout log."
+        footer="Performance entries include workout-linked lifts and standalone metric logs."
       />
     </ScrollView>
   );

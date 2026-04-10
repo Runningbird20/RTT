@@ -7,6 +7,7 @@ import type {
   ExerciseEntryRecord,
   PerformanceEntryRecord,
   PerformanceFormValues,
+  PerformanceMetricFormValues,
   WorkoutLogFormValues,
   WorkoutFormValues,
   WorkoutRecord,
@@ -404,6 +405,55 @@ export async function createWorkoutLog(
     await client.from('workouts').delete().eq('id', workout.id);
     throw error;
   }
+}
+
+export async function createPerformanceMetricEntry(
+  session: Session | null,
+  values: PerformanceMetricFormValues
+): Promise<PerformanceEntryRecord> {
+  const client = getSupabaseClient();
+  const userId = await resolveAppUserId(session);
+  const metricName = values.metricType.trim();
+  const parsedValue = Number(values.value);
+  const unit = values.unit.trim() || null;
+  const now = new Date().toISOString();
+
+  if (!metricName) {
+    throw new Error('Enter a metric type before saving performance.');
+  }
+
+  if (Number.isNaN(parsedValue)) {
+    throw new Error('Enter a valid numeric value before saving performance.');
+  }
+
+  const { data, error } = await client
+    .from('performance_entries')
+    .insert({
+      user_id: userId,
+      workout_id: null,
+      exercise_entry_id: null,
+      exercise_name: null,
+      metric_name: metricName,
+      value: parsedValue,
+      unit,
+      entry_date: now.slice(0, 10),
+      reps: null,
+      weight: null,
+      duration_seconds: null,
+      distance: null,
+      recorded_at: now,
+      notes: null,
+    })
+    .select(
+      'id, user_id, workout_id, exercise_entry_id, exercise_name, metric_name, value, unit, entry_date, reps, weight, duration_seconds, distance, recorded_at, notes, created_at, updated_at'
+    )
+    .single<PerformanceRow>();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapPerformanceRow(data);
 }
 
 export async function createExerciseAndPerformanceEntry(

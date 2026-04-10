@@ -117,3 +117,9 @@ export type PerformanceFormValues = {
   load: string;
   notes: string;
 };
+
+export type PerformanceMetricFormValues = {
+  metricType: string;
+  value: string;
+  unit: string;
+};
