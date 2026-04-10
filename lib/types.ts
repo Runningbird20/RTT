@@ -97,6 +97,14 @@ export type WorkoutFormValues = {
   notes: string;
 };
 
+export type WorkoutLogFormValues = {
+  exercise: string;
+  sets: string;
+  reps: string;
+  weight: string;
+  notes: string;
+};
+
 export type BodyweightFormValues = {
   weight: string;
   measuredAt: string;

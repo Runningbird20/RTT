@@ -7,6 +7,7 @@ import type {
   ExerciseEntryRecord,
   PerformanceEntryRecord,
   PerformanceFormValues,
+  WorkoutLogFormValues,
   WorkoutFormValues,
   WorkoutRecord,
 } from '@/lib/types';
@@ -174,6 +175,32 @@ function buildBodyweightNotes(values: BodyweightFormValues): string | null {
   return parts.length > 0 ? parts.join(' | ') : null;
 }
 
+function buildWorkoutLogTitle(values: WorkoutLogFormValues): string {
+  const exercise = values.exercise.trim() || 'Workout';
+  const sets = values.sets.trim();
+  const reps = values.reps.trim();
+  const weight = values.weight.trim();
+  const summaryParts: string[] = [];
+
+  if (sets && reps) {
+    summaryParts.push(`${sets}x${reps}`);
+  } else {
+    if (sets) {
+      summaryParts.push(`${sets} sets`);
+    }
+
+    if (reps) {
+      summaryParts.push(`${reps} reps`);
+    }
+  }
+
+  if (weight) {
+    summaryParts.push(`@ ${weight} lb`);
+  }
+
+  return summaryParts.length > 0 ? `${exercise} - ${summaryParts.join(' - ')}` : exercise;
+}
+
 export async function fetchLatestWorkout(session: Session | null): Promise<WorkoutRecord | null> {
   const client = getSupabaseClient();
   const userId = await resolveAppUserId(session);
@@ -332,6 +359,46 @@ export async function createBodyweightEntry(
   return mapBodyweightRow(data);
 }
 
+export async function createWorkoutLog(
+  session: Session | null,
+  values: WorkoutLogFormValues
+): Promise<{
+  workout: WorkoutRecord;
+  exerciseEntry: ExerciseEntryRecord;
+  performanceEntry: PerformanceEntryRecord;
+}> {
+  const client = getSupabaseClient();
+
+  if (!values.exercise.trim()) {
+    throw new Error('Enter an exercise name before saving your workout.');
+  }
+
+  const workout = await createWorkout(session, {
+    workoutName: buildWorkoutLogTitle(values),
+    durationMinutes: '',
+    intensity: 'Moderate',
+    notes: values.notes,
+  });
+
+  try {
+    const linkedEntries = await createExerciseAndPerformanceEntry(session, workout.id, {
+      exercise: values.exercise,
+      sets: values.sets,
+      reps: values.reps,
+      load: values.weight,
+      notes: values.notes,
+    });
+
+    return {
+      workout,
+      ...linkedEntries,
+    };
+  } catch (error) {
+    await client.from('workouts').delete().eq('id', workout.id);
+    throw error;
+  }
+}
+
 export async function createExerciseAndPerformanceEntry(
   session: Session | null,
   workoutId: string,
@@ -345,17 +412,17 @@ export async function createExerciseAndPerformanceEntry(
   const now = new Date().toISOString();
   const sets = values.sets ? Number(values.sets) : null;
   const reps = values.reps ? Number(values.reps) : null;
-  const load = values.load ? Number(values.load) : null;
+  const weight = values.load ? Number(values.load) : null;
 
   if (!values.exercise.trim()) {
     throw new Error('Enter an exercise name before saving performance.');
   }
 
-  if (sets === null && reps === null && load === null) {
-    throw new Error('Enter at least one performance metric such as sets, reps, or load.');
+  if (sets === null && reps === null && weight === null) {
+    throw new Error('Enter at least one performance metric such as sets, reps, or weight.');
   }
 
-  if ([sets, reps, load].some((value) => value !== null && Number.isNaN(value))) {
+  if ([sets, reps, weight].some((value) => value !== null && Number.isNaN(value))) {
     throw new Error('Performance metrics must be valid numbers.');
   }
 
@@ -367,7 +434,7 @@ export async function createExerciseAndPerformanceEntry(
       exercise_name: values.exercise.trim() || 'Exercise',
       sets,
       reps,
-      load,
+      load: weight,
       weight_unit: 'lb',
       order_index: 0,
       performed_at: now,
@@ -384,9 +451,10 @@ export async function createExerciseAndPerformanceEntry(
     throw exerciseError;
   }
 
-  const metricName = load !== null ? 'working_set_load' : reps !== null ? 'working_set_reps' : 'working_set_sets';
-  const metricValue = load ?? reps ?? sets ?? 0;
-  const metricUnit = load !== null ? 'lb' : reps !== null ? 'reps' : 'sets';
+  const metricName =
+    weight !== null ? 'working_set_load' : reps !== null ? 'working_set_reps' : 'working_set_sets';
+  const metricValue = weight ?? reps ?? sets ?? 0;
+  const metricUnit = weight !== null ? 'lb' : reps !== null ? 'reps' : 'sets';
 
   const { data: performanceData, error: performanceError } = await client
     .from('performance_entries')
@@ -400,7 +468,7 @@ export async function createExerciseAndPerformanceEntry(
       unit: metricUnit,
       entry_date: now.slice(0, 10),
       reps,
-      weight: load,
+      weight,
       duration_seconds: null,
       distance: null,
       recorded_at: now,

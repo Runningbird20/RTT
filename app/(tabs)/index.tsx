@@ -6,7 +6,6 @@ import BigActionButton from '@/components/BigActionButton';
 import ChartCard from '@/components/ChartCard';
 import StatCard from '@/components/StatCard';
 import Card from '@/components/ui/Card';
-import { getAverage } from '@/lib/calculations';
 import { getSupabaseSetupMessage } from '@/lib/supabase';
 import { fetchRecentWorkouts } from '@/lib/training';
 import { useSupabaseSession } from '@/lib/useSupabaseSession';
@@ -61,7 +60,7 @@ export default function HomeScreen() {
         setRecentWorkouts(workouts);
         setSyncMessage(
           workouts.length > 0
-            ? `Loaded ${workouts.length} recent workouts from Supabase.`
+            ? `Loaded ${workouts.length} recent workout logs from Supabase.`
             : 'Connected to Supabase. Start by saving your first workout on the Log tab.'
         );
       } catch (error) {
@@ -86,10 +85,6 @@ export default function HomeScreen() {
     };
   }, [isFocused, isLoadingSession, isSupabaseConfigured, session]);
 
-  const recentDurations = recentWorkouts
-    .map((workout) => workout.durationMinutes ?? 0)
-    .filter((value) => value > 0);
-  const averageDuration = recentDurations.length > 0 ? getAverage(recentDurations) : 0;
   const workoutChartData: ChartPoint[] =
     recentWorkouts.length > 0
       ? recentWorkouts
@@ -97,7 +92,7 @@ export default function HomeScreen() {
           .reverse()
           .map((workout) => ({
             label: formatShortDate(workout.performedAt),
-            value: workout.durationMinutes ?? 0,
+            value: 1,
           }))
       : [];
 
@@ -107,27 +102,27 @@ export default function HomeScreen() {
         <Text style={styles.eyebrow}>READY TO TRAIN</Text>
         <Text style={styles.title}>Home</Text>
         <Text style={styles.subtitle}>
-          Your dashboard now reads real workout data from Supabase when you are signed in.
+          Your dashboard reads the latest workout logs you save to Supabase.
         </Text>
       </View>
 
       <View style={styles.statsRow}>
         <StatCard
-          title="Recent Workouts"
+          title="Recent Logs"
           value={String(recentWorkouts.length)}
           caption={session ? 'Pulled from Supabase' : 'Sign in to sync'}
         />
         <StatCard
-          title="Average Duration"
-          value={`${averageDuration.toFixed(0)} min`}
-          caption="Across fetched workouts"
+          title="Latest Log"
+          value={recentWorkouts[0] ? formatShortDate(recentWorkouts[0].performedAt) : '--'}
+          caption={recentWorkouts[0]?.title ?? 'Save a workout to see it here.'}
           accent="#0f766e"
         />
       </View>
 
       <BigActionButton
         title="Log today's workout"
-        description="Jump into the log tab to save workouts, bodyweight entries, and exercise performance."
+        description="Jump into the log tab to save exercise, sets, reps, weight, and notes in one form."
       />
 
       <Card style={styles.syncCard}>
@@ -137,12 +132,12 @@ export default function HomeScreen() {
       </Card>
 
       <ChartCard
-        title="Recent Workout Duration"
-        subtitle="Minutes per session"
+        title="Recent Workout Logs"
+        subtitle="One bar per saved session"
         data={workoutChartData}
         footer={
           session
-            ? 'This chart updates from your most recent workouts in Supabase.'
+            ? 'Each bar marks a workout log saved from the Log tab.'
             : 'Sign in to replace the empty chart with your live workout history.'
         }
       />
